@@ -12,6 +12,15 @@ frontend/
   Dockerfile
   src/
 docker-compose.yml
+.env.example
+```
+
+## Environment
+
+Create a local `.env` file from the example:
+
+```bash
+cp .env.example .env
 ```
 
 ## Run Locally
@@ -29,6 +38,9 @@ cd backend
 npm install
 DATABASE_URL=postgres://heimdall:heimdall@localhost:5432/heimdall_test npm run dev
 ```
+
+For Docker Compose, `DATABASE_URL` should point at the `postgres` service host. For a backend
+process running directly on the host, use `localhost`.
 
 Frontend:
 
