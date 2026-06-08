@@ -1,6 +1,6 @@
 # Heimdall Pipeline Test App
 
-Frontend and backend sample project for testing automated build/deploy pipelines.
+Frontend, backend, and PostgreSQL sample project for testing automated build/deploy pipelines.
 
 ## Structure
 
@@ -16,12 +16,18 @@ docker-compose.yml
 
 ## Run Locally
 
+Start PostgreSQL first:
+
+```bash
+docker compose up -d postgres
+```
+
 Backend:
 
 ```bash
 cd backend
 npm install
-npm run dev
+DATABASE_URL=postgres://heimdall:heimdall@localhost:5432/heimdall_test npm run dev
 ```
 
 Frontend:
@@ -46,4 +52,5 @@ Open `http://localhost:3000`.
 
 - `GET /health`
 - `GET /api/status`
-
+- `GET /api/memos`
+- `POST /api/memos`
