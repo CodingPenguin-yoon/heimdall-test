@@ -1,16 +1,54 @@
 import cors from "cors";
 import express from "express";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const { Pool } = pg;
 
-const defaultDatabaseUrl =
-  process.env.DATABASE_URL || "postgres://heimdall:heimdall@localhost:5432/heimdall_test";
+export function databaseConfigFromEnvironment(environment = process.env) {
+  if (!environment.DATABASE_PASSWORD_FILE) {
+    return {
+      connectionString:
+        environment.DATABASE_URL || "postgres://heimdall:heimdall@localhost:5432/heimdall_test",
+    };
+  }
+
+  const requiredNames = [
+    "DATABASE_HOST",
+    "DATABASE_PORT",
+    "DATABASE_NAME",
+    "DATABASE_USER",
+    "DATABASE_SCHEMA",
+  ];
+  for (const name of requiredNames) {
+    if (!environment[name]?.trim()) {
+      throw new Error(`${name} is required with DATABASE_PASSWORD_FILE`);
+    }
+  }
+
+  const port = Number(environment.DATABASE_PORT);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("DATABASE_PORT must be a valid TCP port");
+  }
+
+  const password = readFileSync(environment.DATABASE_PASSWORD_FILE, "utf8").replace(/\r?\n$/, "");
+  if (!password) {
+    throw new Error("DATABASE_PASSWORD_FILE must not be empty");
+  }
+
+  return {
+    host: environment.DATABASE_HOST,
+    port,
+    database: environment.DATABASE_NAME,
+    user: environment.DATABASE_USER,
+    password,
+  };
+}
 
 export class PostgresMemoStore {
-  constructor(connectionString = defaultDatabaseUrl) {
-    this.pool = new Pool({ connectionString });
+  constructor(config = databaseConfigFromEnvironment()) {
+    this.pool = new Pool(config);
   }
 
   async init() {
@@ -127,7 +165,7 @@ export function createApp({ memoStore = new PostgresMemoStore() } = {}) {
     }
   });
 
-  app.get("/api/status", async (_req, res) => {
+  app.get(["/api", "/api/status"], async (_req, res) => {
     try {
       const databaseConnected = await memoStore.health();
 
