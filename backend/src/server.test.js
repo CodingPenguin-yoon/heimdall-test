@@ -1,12 +1,76 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createApp, MemoryMemoStore } from "./server.js";
+import { createApp, databasePoolConfig, MemoryMemoStore } from "./server.js";
 
 function listen(appInstance) {
   return new Promise((resolve) => {
     const server = appInstance.listen(0, "127.0.0.1", () => resolve(server));
   });
 }
+
+test("databasePoolConfig keeps DATABASE_URL compatibility", () => {
+  const config = databasePoolConfig(
+    { DATABASE_URL: "postgres://local:local@postgres:5432/local" },
+    () => assert.fail("password file must not be read when DATABASE_URL is set"),
+  );
+
+  assert.deepEqual(config, {
+    connectionString: "postgres://local:local@postgres:5432/local",
+  });
+});
+
+test("databasePoolConfig reads the Heimdall password file contract", () => {
+  const paths = [];
+  const config = databasePoolConfig(
+    {
+      DATABASE_HOST: "managed-postgres",
+      DATABASE_PORT: "5432",
+      DATABASE_NAME: "project_db",
+      DATABASE_USER: "project_role",
+      DATABASE_SCHEMA: "app",
+      DATABASE_PASSWORD_FILE: "/run/secrets/heimdall/database/password",
+    },
+    (path) => {
+      paths.push(path);
+      return "file-password\n";
+    },
+  );
+
+  assert.deepEqual(paths, ["/run/secrets/heimdall/database/password"]);
+  assert.deepEqual(config, {
+    host: "managed-postgres",
+    port: 5432,
+    database: "project_db",
+    user: "project_role",
+    password: "file-password",
+    options: "-c search_path=app,pg_catalog",
+  });
+});
+
+test("databasePoolConfig rejects an incomplete Heimdall contract", () => {
+  assert.throws(
+    () => databasePoolConfig({ DATABASE_HOST: "managed-postgres" }, () => "unused"),
+    /Missing managed database environment variables/,
+  );
+});
+
+test("databasePoolConfig rejects an invalid managed database port", () => {
+  assert.throws(
+    () =>
+      databasePoolConfig(
+        {
+          DATABASE_HOST: "managed-postgres",
+          DATABASE_PORT: "not-a-port",
+          DATABASE_NAME: "project_db",
+          DATABASE_USER: "project_role",
+          DATABASE_SCHEMA: "app",
+          DATABASE_PASSWORD_FILE: "/run/secrets/heimdall/database/password",
+        },
+        () => "file-password",
+      ),
+    /DATABASE_PORT must be an integer/,
+  );
+});
 
 test("GET /health returns ok", async () => {
   const app = createApp({ memoStore: new MemoryMemoStore() });

@@ -60,6 +60,29 @@ docker compose up --build
 
 Open `http://localhost:3000`.
 
+## Deploy With Heimdall
+
+Configure two build services from the same `main` commit:
+
+- `frontend`: context `frontend`, port `80`, health `/`
+- `backend`: context `backend`, port `4000`, health `/health`, Managed PostgreSQL enabled
+- route `/` to `frontend` and `/api` to `backend`
+
+Heimdall does not place the database password in `DATABASE_URL` or the container environment.
+When `DATABASE_URL` is absent, the backend reads the managed database contract below and loads
+the password from the read-only file referenced by `DATABASE_PASSWORD_FILE`:
+
+```text
+DATABASE_HOST
+DATABASE_PORT
+DATABASE_NAME
+DATABASE_USER
+DATABASE_SCHEMA
+DATABASE_PASSWORD_FILE
+```
+
+The existing `DATABASE_URL` path remains available for local Docker Compose development.
+
 ## Endpoints
 
 - `GET /health`
