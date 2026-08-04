@@ -1,16 +1,66 @@
 import cors from "cors";
 import express from "express";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const { Pool } = pg;
 
-const defaultDatabaseUrl =
-  process.env.DATABASE_URL || "postgres://heimdall:heimdall@localhost:5432/heimdall_test";
+const localDatabaseUrl = "postgres://heimdall:heimdall@localhost:5432/heimdall_test";
+const managedDatabaseKeys = [
+  "DATABASE_HOST",
+  "DATABASE_PORT",
+  "DATABASE_NAME",
+  "DATABASE_USER",
+  "DATABASE_SCHEMA",
+  "DATABASE_PASSWORD_FILE",
+];
+
+export function databasePoolConfig(
+  environment = process.env,
+  readPasswordFile = (path) => readFileSync(path, "utf8"),
+) {
+  if (environment.DATABASE_URL) {
+    return { connectionString: environment.DATABASE_URL };
+  }
+
+  const configuredKeys = managedDatabaseKeys.filter((key) => environment[key]);
+  if (configuredKeys.length === 0) {
+    return { connectionString: localDatabaseUrl };
+  }
+
+  const missingKeys = managedDatabaseKeys.filter((key) => !environment[key]);
+  if (missingKeys.length > 0) {
+    throw new Error(`Missing managed database environment variables: ${missingKeys.join(", ")}`);
+  }
+
+  const port = Number(environment.DATABASE_PORT);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("DATABASE_PORT must be an integer between 1 and 65535");
+  }
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(environment.DATABASE_SCHEMA)) {
+    throw new Error("DATABASE_SCHEMA must be a PostgreSQL identifier");
+  }
+
+  const passwordFile = readPasswordFile(environment.DATABASE_PASSWORD_FILE);
+  const password = typeof passwordFile === "string" ? passwordFile.replace(/[\r\n]+$/, "") : "";
+  if (password.length === 0) {
+    throw new Error("DATABASE_PASSWORD_FILE must contain a password");
+  }
+
+  return {
+    host: environment.DATABASE_HOST,
+    port,
+    database: environment.DATABASE_NAME,
+    user: environment.DATABASE_USER,
+    password,
+    options: `-c search_path=${environment.DATABASE_SCHEMA},pg_catalog`,
+  };
+}
 
 export class PostgresMemoStore {
-  constructor(connectionString = defaultDatabaseUrl) {
-    this.pool = new Pool({ connectionString });
+  constructor(config = databasePoolConfig()) {
+    this.pool = new Pool(config);
   }
 
   async init() {
