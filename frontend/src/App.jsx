@@ -7,7 +7,7 @@ const memosUrl = `${apiBase}/api/memos`;
 
 const statusText = {
   checking: "연결 확인 중",
-  connected: "연결 완료~ 202608110958",
+  connected: "연결 완료  202608111126",
   disconnected: "연결 X",
 };
 
