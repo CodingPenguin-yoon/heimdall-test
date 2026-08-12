@@ -234,6 +234,9 @@ export const app = createApp();
 const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isDirectRun) {
+  console.error("INTENTIONAL_DEPLOYMENT_FAILURE");
+  process.exit(1);
+
   const port = Number(process.env.PORT || 4000);
   const memoStore = new PostgresMemoStore();
   const serverApp = createApp({ memoStore });
